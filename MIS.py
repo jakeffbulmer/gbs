@@ -4,6 +4,7 @@ from thewalrus.quantum import Amat, Qmat
 from strawberryfields.decompositions import williamson
 from loop_hafnian import loop_hafnian
 from scipy.special import factorial
+from time import perf_counter
 
 rng = np.random.default_rng()
 
@@ -14,11 +15,9 @@ def R_to_alpha(R, hbar=2):
     return alpha
 
 class MISChainBase(abc.ABC):
-    def __init__(self, cov, N, lhaf_func=loop_hafnian, rank=0, start_sampling=True):
+    def __init__(self, cov, N, lhaf_func=loop_hafnian, start_sampling=True):
 
         self.lhaf_func = lhaf_func
-
-        self.rank = rank
 
         self.cov = cov 
         M = cov.shape[0] // 2

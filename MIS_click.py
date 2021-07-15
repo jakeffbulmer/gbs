@@ -1,10 +1,11 @@
 import numpy as np 
 from thewalrus.quantum import Amat, Qmat
-from strawberryfields.decomposition import williamson
+from strawberryfields.decompositions import williamson
 from thewalrus.symplectic import loss
 from loop_hafnian import loop_hafnian
 from scipy.special import factorial
 from scipy.linalg import block_diag
+from time import perf_counter
 
 rng = np.random.default_rng()
 
