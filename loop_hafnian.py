@@ -16,6 +16,22 @@ def _calc_loop_hafnian(A, D, edge_reps,
         oddloop=None, oddV=None,
         glynn=True):
 
+    """
+    compute loop hafnian, using inputs as prepared by frontend loop_hafnian function
+
+    compiled with Numba
+
+    Args:
+        A (array): matrix ordered according to the chosen perfect matching
+        D (array): diagonals ordered according to the chosen perfect matching
+        edge_reps (array): how many times each edge in the perfect matching is repeated
+        oddloop (float): weight of self-loop in perfect matching, None if no self-loops
+        oddV (array): row of matrix corresponding to the odd loop in the perfect matching
+        glynn (bool): whether to use finite difference sieve
+    Returns:
+        complex128: value of loop hafnian
+    """
+
     n = A.shape[0]
     N = 2 * edge_reps.sum() # number of photons
     if oddloop is not None:
@@ -69,12 +85,20 @@ def _calc_loop_hafnian(A, D, edge_reps,
 def loop_hafnian(A, D=None, reps=None,
     glynn=True):
     """
-    calculate loop hafnian of NxN matrix, A
-    reps is an optional N length vector which tells us
-    how many times each row/column is repeated
+    calculate loop hafnian with (optional) repeated rows and columns
+
+    Args:
+        A (array): N x N matrix 
+        D (array): diagonal entries of matrix (optional). If not provided, D is the diagonal of A.
+                    If repetitions are provided, D should be provided explicitly
+        reps (list): length-N list of repetitions of each row/col (optional), if not provided, each row/column
+                    assumed to be repeated once
+        glynn (bool): If True, use Glynn-style finite difference sieve formula, if False, use Ryser style inclusion/exclusion principle.
+
+    Returns
+        np.complex128: result of loop hafnian calculation
+
     """
-    # A is the matrix without repeats, reps contains the number of repeats for
-    # each index
 
     n = A.shape[0]
 
@@ -97,7 +121,7 @@ def loop_hafnian(A, D=None, reps=None,
 
     x, edge_reps, oddmode = matched_reps(reps)
 
-    # make new A matrix and D vector using the ordering from above... 
+    # make new A matrix and D vector using the ordering from above
     
     if oddmode is not None:
         oddloop = D[oddmode].astype(np.complex128)

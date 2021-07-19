@@ -5,6 +5,12 @@ import numpy as np
 def nb_binom(n, k):
     """
     numba version of binomial coefficient function
+
+    Args:
+        n (int): how many options
+        k (int): how many are chosen
+    Returns:
+        int: how many ways of choosing
     """
     if k < 0 or k > n:
         return 0
@@ -18,6 +24,14 @@ def nb_binom(n, k):
 
 @numba.jit(nopython=True, cache=True)
 def precompute_binoms(max_binom):
+    """
+    precompute binomial coefficients, return as a 2d array
+
+    Args:
+        max_binom (int): max value of n in the binomial
+    Returns:
+        array: max_binom+1 x max_binom+1 array of binomial coefficients
+    """
     binoms = np.zeros((max_binom+1, max_binom+1), dtype=type(max_binom))
     for i in range(max_binom+1):
         for j in range(max_binom+1):
@@ -41,6 +55,14 @@ def matched_reps(reps):
     """
     takes the repeated rows and find a way to pair them up
     to create a perfect matching with many repeated edges
+
+    Args:
+        reps (list): list of repeated rows/cols
+
+    Returns:
+        x (array): vertex pairs, length 2N for N edges. Index i is matched with i+N
+        edgereps (array): length N array for how many times each edge is repeated
+        oddmode (int or None): index of odd mode, None if even number of vertices
     """
     n = len(reps)
 
@@ -48,11 +70,11 @@ def matched_reps(reps):
         return np.array([], dtype=int), np.array([], dtype=int), None
 
     # need to pair off the indices with high numbers of repetitions...
-    x = range(n) #the starting set of indices
-    edgesA = []  #contains part A of each pair
-    edgesB = [] #part B of each pair
-    edgereps = [] #number of repetitions of a pair
-    reps, x = zip(*sorted(zip(reps, x), reverse=True)) #sort according to reps, in descending order
+    x = range(n) # the starting set of indices
+    edgesA = []  # contains part A of each pair
+    edgesB = [] # part B of each pair
+    edgereps = [] # number of repetitions of a pair
+    reps, x = zip(*sorted(zip(reps, x), reverse=True)) # sort according to reps, in descending order
     reps = list(reps)
     x = list(x)
 
@@ -113,6 +135,13 @@ def matched_reps(reps):
 def find_kept_edges(j, reps):
     """
     write j as a string where the ith digit is in base (reps[i]+1)
+    decides which edges are included given index of the inclusion/exclusion sum
+
+    Args:
+        j (int): index of sum
+        reps (list): number of repetitions of each edge
+    Returns:
+        array : number of repetitions kept for the current inclusion/exclusion step
     """
     num = j
     output = []
@@ -124,10 +153,18 @@ def find_kept_edges(j, reps):
 
 @numba.jit(nopython=True, cache=True)
 def f_loop(E, AX_S, XD_S, D_S, n):
-    """evaluate the function inside the sum 
-    of the loop hafnian formula"""
-    ### could be replaced by La Budda (a la thewalrus)
+    """
+    evaluate the polyonial coefficients of the function in the eigevalue-trace formula
 
+    Args:
+        E (array): eigevavlues of AX
+        AX_S (array): AX_S with weights given by repetitions and exluded rows removed
+        XD_S (array): Diagonal multiplied by X
+        D_S (array): Diagonal
+        n (int): number of polynomial coefficients to compute
+    Returns:
+        array: polynomial coefficients
+    """
     E_k = E.copy()
     # Compute combinations in O(n^2log n) time 
     # code translated from thewalrus matlab script
@@ -147,9 +184,23 @@ def f_loop(E, AX_S, XD_S, D_S, n):
                 comb[count, k-1] += comb[1-count, k-i*j-1] * powfactor        
     return comb[count, :]
 
-@numba.jit(nopython=True)
+@numba.jit(nopython=True, cache=True)
 def f_loop_odd(E, AX_S, XD_S, D_S, n, oddloop, oddVX_S):
+    """
+    evaluate the polyonial coefficients of the function in the eigevalue-trace formula
+    when there is a self-edge in the fixed perfect matching
 
+    Args:
+        E (array): eigevavlues of AX
+        AX_S (array): AX_S with weights given by repetitions and exluded rows removed
+        XD_S (array): Diagonal multiplied by X
+        D_S (array): Diagonal
+        n (int): number of polynomial coefficients to compute
+        oddloop (float): weight of self-edge
+        oddVX_S (array): vector corresponding to matrix at the index of the self-edge
+    Returns:
+        array: polynomial coefficients
+    """
     E_k = E.copy()
 
     count = 0
@@ -177,6 +228,20 @@ def f_loop_odd(E, AX_S, XD_S, D_S, n, oddloop, oddVX_S):
 
 @numba.jit(nopython=True, cache=True)
 def get_submatrices(kept_edges, A, D, oddV):
+    """
+    given the kept edges, return the appropriate scaled submatrices to compute f
+
+    Args:
+        kept_edges (array): number of repetitions of each edge
+        A (array): matrix before repetitions applied
+        D (array): diagonal before repetitions applied 
+        oddV (array): row of matrix at index of self-edge, None is no self-edge
+    Returns:
+        AX_nonzero (array): scaled A @ X (where X = ((0, I), (I, 0))
+        XD_nonzero (array): scaled X @ D 
+        D_nonzero (array): scaled D
+        oddVX_nonzero (array): scaled oddV @ X
+    """
 
     z = np.concatenate((kept_edges, kept_edges))
     nonzero_rows = np.where(z != 0)[0]
@@ -208,6 +273,17 @@ def get_submatrices(kept_edges, A, D, oddV):
 
 @numba.jit(nopython=True, cache=True)
 def get_submatrix_batch_odd0(kept_edges, oddV0):
+    """
+    find oddVX_nonzero0 for batching (sometimes different vertices are identified as self edges)
+
+    Args:
+        kept_edges (array): number of repetitions of each edge
+        oddV0 (array): row of matrix at index of self-edge, None is no self-edge
+    
+    Returns:
+        array: scaled oddV0 @ X for 
+
+    """
     z = np.concatenate((kept_edges, kept_edges))
     nonzero_rows = np.where(z != 0)[0]
     n_nonzero_edges = len(nonzero_rows) // 2
@@ -222,6 +298,9 @@ def get_submatrix_batch_odd0(kept_edges, oddV0):
 
 @numba.jit(nopython=True, cache=True)
 def get_Dsubmatrices(kept_edges, D):
+    """
+    find submatrices for batch gamma functions
+    """
 
     z = np.concatenate((kept_edges, kept_edges))
     nonzero_rows = np.where(z != 0)[0]
