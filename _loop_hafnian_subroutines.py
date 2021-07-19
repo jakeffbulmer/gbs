@@ -152,6 +152,35 @@ def find_kept_edges(j, reps):
     return np.array(output[::-1], dtype=reps.dtype)
 
 @numba.jit(nopython=True, cache=True)
+def f(E, AX_S, n):
+    """
+    evaluate the polyonial coefficients of the function in the eigevalue-trace formula
+
+    Args:
+        E (array): eigevavlues of AX
+        n (int): number of polynomial coefficients to compute
+    Returns:
+        array: polynomial coefficients
+    """
+    E_k = E.copy()
+    # Compute combinations in O(n^2log n) time 
+    # code translated from thewalrus matlab script
+    count = 0
+    comb = np.zeros((2, n//2+1), dtype=np.complex128)    
+    comb[0,0] = 1
+    for i in range(1, n//2+1):
+        factor = E_k.sum() / (2 * i)
+        E_k *= E
+        powfactor = 1
+        count = 1 - count
+        comb[count, :] = comb[1-count, :]
+        for j in range(1, n//(2*i)+1):
+            powfactor *= factor / j
+            for k in range(i*j+1, n//2+2):
+                comb[count, k-1] += comb[1-count, k-i*j-1] * powfactor        
+    return comb[count, :]
+
+@numba.jit(nopython=True, cache=True)
 def f_loop(E, AX_S, XD_S, D_S, n):
     """
     evaluate the polyonial coefficients of the function in the eigevalue-trace formula
@@ -225,6 +254,32 @@ def f_loop_odd(E, AX_S, XD_S, D_S, n, oddloop, oddVX_S):
                 comb[count, k-1] += comb[1-count, k-i*j-1] * powfactor        
 
     return comb[count, :]
+
+@numba.jit(nopython=True, cache=True)
+def get_AX_S(kept_edges, A):
+    """
+    given the kept edges, return the appropriate scaled submatrices to compute f
+
+    Args:
+        kept_edges (array): number of repetitions of each edge
+        A (array): matrix before repetitions applied
+    Returns:
+        AX_nonzero (array): scaled A @ X (where X = ((0, I), (I, 0))
+    """
+
+    z = np.concatenate((kept_edges, kept_edges))
+    nonzero_rows = np.where(z != 0)[0]
+    n_nonzero_edges = len(nonzero_rows) // 2
+
+    kept_edges_nonzero = kept_edges[np.where(kept_edges != 0)]
+
+    A_nonzero = nb_ix(A, nonzero_rows, nonzero_rows)
+
+    AX_nonzero = np.empty_like(A_nonzero, dtype=np.complex128)
+    AX_nonzero[:,:n_nonzero_edges] = kept_edges_nonzero * A_nonzero[:,n_nonzero_edges:]
+    AX_nonzero[:,n_nonzero_edges:] = kept_edges_nonzero * A_nonzero[:,:n_nonzero_edges]
+
+    return AX_nonzero
 
 @numba.jit(nopython=True, cache=True)
 def get_submatrices(kept_edges, A, D, oddV):
