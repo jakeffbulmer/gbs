@@ -60,7 +60,7 @@ def _calc_hafnian(A, edge_reps, glynn=True):
 
         if glynn and kept_edges[0]==0:
             prefac *= 0.5
-        Hnew = prefac * f(E, AX_S, N)[N//2]
+        Hnew = prefac * f(E, N)[N//2]
 
         H += Hnew
 

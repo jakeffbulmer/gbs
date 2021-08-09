@@ -152,7 +152,7 @@ def find_kept_edges(j, reps):
     return np.array(output[::-1], dtype=reps.dtype)
 
 @numba.jit(nopython=True, cache=True)
-def f(E, AX_S, n):
+def f(E, n):
     """
     evaluate the polyonial coefficients of the function in the eigevalue-trace formula
 
